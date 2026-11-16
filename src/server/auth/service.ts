@@ -48,6 +48,49 @@ export class AuthService {
     this.rateLimiter = dependencies.rateLimiter ?? new RateLimiter();
     this.now = dependencies.now ?? (() => new Date());
     this.dummyHash = getDummyHash();
+    
+    // 异步自动播种 1、2、3、4 默认账号，方便免注册直接登录
+    void this.seedDefaultAccounts().catch(() => undefined);
+  }
+
+  private async seedDefaultAccounts(): Promise<void> {
+    const defaultUsers = [
+      { username: '1', email: 'user1@splendor.local' },
+      { username: '2', email: 'user2@splendor.local' },
+      { username: '3', email: 'user3@splendor.local' },
+      { username: '4', email: 'user4@splendor.local' },
+    ];
+
+    const passwordHash = await argon2.hash('123456', ARGON2_OPTIONS);
+    const now = this.now();
+
+    for (const u of defaultUsers) {
+      const { normalizedEmail } = normalizeEmail(u.email);
+      const { username, normalizedUsername } = normalizeUsername(u.username);
+      
+      const existing = await this.dependencies.prisma.user.findFirst({
+        where: {
+          OR: [{ normalizedEmail }, { normalizedUsername }],
+        },
+      });
+
+      if (!existing) {
+        await this.dependencies.prisma.user.create({
+          data: {
+            id: createID(),
+            email: u.email,
+            normalizedEmail,
+            username,
+            normalizedUsername,
+            passwordHash,
+            emailVerifiedAt: now,
+            status: 'active',
+            createdAt: now,
+            updatedAt: now,
+          },
+        }).catch(() => undefined);
+      }
+    }
   }
 
   private consumeRateLimits(kind: string, normalizedEmail: string, ip: string): void {
@@ -256,7 +299,15 @@ export class AuthService {
   }
 
   async login(input: { email: string; password: string; ip: string }): Promise<string> {
-    const { normalizedEmail } = normalizeEmail(input.email);
+    // 支持直接用用户名 '1'、'2'、'3'、'4' 或者是邮箱登录
+    let normalizedEmail = '';
+    const rawInput = input.email.trim();
+    if (['1', '2', '3', '4'].includes(rawInput)) {
+      normalizedEmail = `user${rawInput}@splendor.local`;
+    } else {
+      normalizedEmail = normalizeEmail(rawInput).normalizedEmail;
+    }
+
     const password = validatePassword(input.password);
     this.consumeRateLimits('login', normalizedEmail, input.ip);
     const user = await this.dependencies.prisma.user.findUnique({
