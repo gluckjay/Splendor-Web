@@ -55,13 +55,13 @@ export class AuthService {
 
   private async seedDefaultAccounts(): Promise<void> {
     const defaultUsers = [
-      { username: '1', email: 'user1@splendor.local' },
-      { username: '2', email: 'user2@splendor.local' },
-      { username: '3', email: 'user3@splendor.local' },
-      { username: '4', email: 'user4@splendor.local' },
+      { username: '1', email: '1@email' },
+      { username: '2', email: '2@email' },
+      { username: '3', email: '3@email' },
+      { username: '4', email: '4@email' },
     ];
 
-    const passwordHash = await argon2.hash('123456', ARGON2_OPTIONS);
+    const passwordHash = await argon2.hash('123123123', ARGON2_OPTIONS);
     const now = this.now();
 
     for (const u of defaultUsers) {
